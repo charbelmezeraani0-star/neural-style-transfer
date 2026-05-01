@@ -1,176 +1,182 @@
-<div align="center">
+# NST Studio
 
-# Neural Style Transfer Studio
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
+![PyTorch](https://img.shields.io/badge/PyTorch-2.x-ee4c2c?logo=pytorch&logoColor=white)
+![Flask](https://img.shields.io/badge/Flask-3.x-black?logo=flask&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green)
 
-**Transform any photograph into a work of art using deep learning.**
-
-Built on the algorithm introduced by Gatys et al. (2015), this project uses a frozen VGG-19 convolutional network to extract content and style representations from images, then optimizes a generated image to simultaneously match both — producing stunning artistic renderings directly in the browser.
-
-[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.10-EE4C2C?style=flat-square&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Flask](https://img.shields.io/badge/Flask-3.1-000000?style=flat-square&logo=flask&logoColor=white)](https://flask.palletsprojects.com)
-[![CUDA](https://img.shields.io/badge/CUDA-12.8-76B900?style=flat-square&logo=nvidia&logoColor=white)](https://developer.nvidia.com/cuda-toolkit)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
-
-</div>
-
----
-
-## Overview
-
-Neural Style Transfer (NST) treats artistic style as a learnable signal. Rather than training a model, it runs iterative gradient descent **on the pixel values of a generated image**, minimizing two competing losses:
-
-| Loss | What it measures | VGG layer |
-|---|---|---|
-| **Content loss** | MSE between feature maps of the generated and content images | `conv_4` |
-| **Style loss** | MSE between Gram matrices of the generated and style images | `conv_1`, `conv_2`, `conv_3` |
-
-The Gram matrix captures **channel-wise feature correlations** — texture and style — independently of spatial structure. Using only the early convolutional layers for style preserves low-level artistic texture without imposing large-scale composition from the style image.
+A full-stack Neural Style Transfer application with a modern web UI. Supports both **Classic NST** (Gatys et al. 2015) for any style image, and **Fast NST** (Johnson et al. 2016) for instant inference using a pre-trained feed-forward network.
 
 ---
 
 ## Features
 
-- **Web UI** — drag-and-drop upload, live progress bar, before/after comparison, one-click download
-- **Real-time feedback** — Server-Sent Events stream step count and loss values as optimization runs
-- **Tunable parameters** — iterations, style strength, and content fidelity controllable from the UI
-- **GPU-accelerated** — automatically uses CUDA when available; falls back to CPU
-- **Clean separation** — `nst_core.py` is a self-contained engine importable independently of Flask
+**Classic NST**
+- Iterative pixel optimisation using frozen VGG-19
+- Adjustable iterations, style strength, and content fidelity
+- Real-time progress via Server-Sent Events
+
+**Fast NST**
+- Feed-forward TransformerNet — inference in under a second
+- 8 quality improvements over the baseline Johnson 2016 model:
+  - 5-layer VGG style loss (relu1_2 → relu5_3)
+  - Multi-scale gram matrices (3 scales averaged)
+  - Feature statistics loss (per-channel mean + std matching)
+  - Identity loss (net(style) ≈ style)
+  - Per-layer style weights
+  - LR warmup + cosine annealing
+  - Mixed precision (AMP) + gradient clipping
+  - **PatchGAN adversarial loss** — 70×70 discriminator enforces micro-texture realism
+
+**Web UI**
+- Drag-and-drop image upload
+- Before/After comparison slider on results
+- Results gallery with fullscreen viewer
+- Training sample previews per model
+- Toast notifications
 
 ---
 
 ## Architecture
 
 ```
-ml project/
-├── nst_core.py          # NST engine (VGG-19, losses, optimizer loop)
-├── app.py               # Flask server (upload, SSE progress, result serving)
-├── templates/
-│   └── index.html       # Single-page web UI
-├── static/
-│   ├── css/style.css    # Dark glassmorphism theme
-│   └── js/app.js        # Drag-drop, SSE client, UI state
-├── NST/
-│   ├── NST.ipynb                # Original research notebook
-│   ├── NST (tuned).ipynb        # Tuned hyperparameters notebook
-│   └── images/
-│       ├── content/             # Sample content images
-│       └── styles/              # Sample style images
-├── uploads/             # Temporary upload storage (git-ignored)
-└── outputs/             # Generated results (git-ignored)
+┌─────────────────────────────────────────────────────┐
+│  Browser (HTML + CSS + JS)                          │
+│  Drag-drop upload · Comparison slider · Gallery     │
+└─────────────────────────┬───────────────────────────┘
+                          │ HTTP / SSE
+┌─────────────────────────▼───────────────────────────┐
+│  Flask  app.py                                      │
+│  /upload   /progress/<id>   /fast-stylize           │
+│  /models   /gallery         /sample-img/<m>/<f>     │
+└────────────┬────────────────────────┬───────────────┘
+             │                        │
+┌────────────▼──────────┐  ┌──────────▼──────────────┐
+│  nst_core.py          │  │  fast_nst.py             │
+│  Classic NST          │  │  Feed-forward inference  │
+│  VGG-19 optimisation  │  │  TransformerNet          │
+└───────────────────────┘  └──────────────────────────┘
 ```
-
-### How the model is built
-
-```
-Input image (pixels, requires_grad=True)
-    │
-    ▼
-nn.Sequential(
-  Normalization          ← ImageNet mean/std applied inside the model
-  conv_1  →  StyleLoss   ← Gram matrix target frozen at init
-  relu_1
-  conv_2  →  StyleLoss
-  relu_2
-  conv_3  →  StyleLoss
-  relu_3
-  conv_4  →  ContentLoss ← Feature map target frozen at init
-  ...      (trimmed here)
-)
-```
-
-All VGG-19 parameters are frozen. Only `input_img` pixels are optimized via **L-BFGS** — a quasi-Newton method well-suited to this problem because it accounts for second-order curvature, converging significantly faster than Adam or SGD.
 
 ---
 
-## Getting Started
-
-### Prerequisites
-
-- Python 3.10+
-- CUDA-capable GPU recommended (CPU works but is slow)
-
-### Installation
+## Quick Start
 
 ```bash
-git clone https://github.com/charbelmezeraani0-star/neural-style-transfer.git
-cd neural-style-transfer
+# Install dependencies
+pip install -r requirements.txt
 
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
-pip install flask pillow
-```
-
-### Run the web app
-
-```bash
+# Start the web app
 python app.py
-```
 
-Open [http://localhost:5000](http://localhost:5000) in your browser.
-
-1. Drop your **content image** (the photo to stylize) on the left zone
-2. Drop your **style image** (the artwork to draw from) on the right zone
-3. Optionally expand **Advanced Settings** to tune iterations and weights
-4. Click **Generate** — a live progress bar tracks each optimization step
-5. Download the result when complete
-
-### Use the core engine directly
-
-```python
-from nst_core import run_style_transfer
-
-def on_progress(step, total, style_loss, content_loss):
-    print(f"[{step}/{total}]  style={style_loss:.2f}  content={content_loss:.4f}")
-
-output_pil = run_style_transfer(
-    content_path="photo.jpg",
-    style_path="artwork.jpg",
-    num_steps=300,
-    style_weight=30_000_000,
-    content_weight=3,
-    progress_callback=on_progress,
-)
-output_pil.save("result.png")
+# Open browser
+http://localhost:5000
 ```
 
 ---
 
-## Hyperparameter Guide
+## Training a Fast NST Model
 
-| Parameter | Default | Effect |
-|---|---|---|
-| `num_steps` | `300` | More steps → stronger stylization, longer runtime |
-| `style_weight` | `30,000,000` | Higher → style dominates, content structure fades |
-| `content_weight` | `3` | Higher → content structure preserved, less stylized |
-| Style layers | `conv_1–3` | Earlier layers capture finer textures; adding `conv_4/5` makes style coarser |
+### 1. Download MS-COCO train2014
 
-**Ratio** `style_weight / content_weight` is what matters. The defaults (`30M / 3 = 10M`) are tuned for pencil-sketch styles. For painting styles, try `style_weight=50_000_000, content_weight=1`.
+Get the dataset from [cocodataset.org](https://cocodataset.org/#download) (~13 GB) and place the zip in `~/Downloads/`.
+
+### 2. Train
+
+```bash
+bash start_training.sh
+```
+
+This will:
+1. Unzip the dataset (first run only)
+2. Validate all images and write a clean manifest (first run only, ~2 min)
+3. Train a `pencil_sketch` model for 4 epochs (~8–10 hrs on RTX 4050)
+4. Save sample previews every 500 steps to `samples/pencil_sketch/`
+5. Log loss curves to TensorBoard under `runs/`
+
+**Monitor training:**
+```bash
+# Live loss curves
+tensorboard --logdir runs
+
+# Sample previews
+samples/pencil_sketch/step_000500.jpg
+samples/pencil_sketch/step_001000.jpg
+...
+```
+
+**Resume after interruption:**
+```bash
+bash start_training.sh --resume
+```
+
+### 3. Train multiple styles
+
+Add style images to `NST/images/styles/`, then:
+
+```bash
+bash train_all_styles.sh
+```
+
+Each `.jpg` or `.png` in that folder becomes its own model. Already-trained models are skipped.
 
 ---
 
-## Technical Reference
+## Training Hyperparameters
 
-**Paper:** Gatys, L. A., Ecker, A. S., & Bethge, M. (2015). [A Neural Algorithm of Artistic Style](https://arxiv.org/abs/1508.06576). *arXiv:1508.06576*
-
-**Key implementation choices vs. the paper:**
-
-- Normalization lives **inside** the model (not pre-applied to the image tensor). This keeps pixel values in `[0, 1]` throughout, which is required for correct L-BFGS clamping and also makes the engine portable.
-- Style layers reduced to `conv_1–3` (vs. `conv_1–5` in the paper) — empirically produces cleaner texture transfer for sketch/line-art styles while running faster.
-- `torch.set_default_device` is **not** used in `nst_core.py` to keep it importable without side effects.
+| Flag | Default | Effect |
+|------|---------|--------|
+| `--epochs` | 4 | More epochs = better texture, diminishing returns after 6 |
+| `--batch-size` | 4 | Increase if VRAM allows; 8 gives ~10% faster training |
+| `--image-size` | 256 | 288–320 for higher quality; slower per step |
+| `--style-weight` | 5e10 | Higher = more stylized, less content |
+| `--content-weight` | 1e5 | Higher = more faithful to content |
+| `--adv-weight` | 1e4 | PatchGAN loss; raise to 5e4 for sharper textures |
+| `--sample-every` | 500 | Steps between saved preview images |
 
 ---
 
-## Dependencies
+## Project Structure
 
-| Package | Version |
-|---|---|
-| `torch` | 2.10.0+cu128 |
-| `torchvision` | 0.25.0+cu128 |
-| `flask` | 3.1.3 |
-| `pillow` | 10.2.0 |
+```
+ml project/
+├── app.py               Flask web server
+├── nst_core.py          Classic NST engine (VGG-19 optimisation)
+├── fast_nst.py          Fast NST inference helper
+├── train.py             Fast NST training script
+├── transformer_net.py   TransformerNet + PatchDiscriminator
+├── preprocess.py        Dataset validation & manifest generation
+├── start_training.sh    One-command training launcher
+├── train_all_styles.sh  Train all styles in NST/images/styles/
+├── requirements.txt
+├── models/              Trained .pth model files
+├── samples/             Per-step training preview images
+├── runs/                TensorBoard logs
+├── NST/images/styles/   Style images for training
+├── templates/
+│   └── index.html
+└── static/
+    ├── css/style.css
+    └── js/app.js
+```
+
+---
+
+## Results
+
+*Training in progress — results will be added here after the first run completes.*
+
+---
+
+## References
+
+- Gatys, L. A., Ecker, A. S., & Bethge, M. (2016). [A Neural Algorithm of Artistic Style](https://arxiv.org/abs/1508.06576)
+- Johnson, J., Alahi, A., & Fei-Fei, L. (2016). [Perceptual Losses for Real-Time Style Transfer](https://arxiv.org/abs/1603.08155)
+- Isola, P., et al. (2017). [Image-to-Image Translation with Conditional Adversarial Networks](https://arxiv.org/abs/1611.07004) (PatchGAN)
+- Ulyanov, D., et al. (2017). [Instance Normalization: The Missing Ingredient for Fast Stylization](https://arxiv.org/abs/1607.08022)
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE) for details.
+MIT

@@ -220,3 +220,18 @@ __marimo__/
 # NST Studio — runtime dirs
 uploads/
 outputs/
+
+# Dataset (13 GB — too large for GitHub)
+train2014/
+
+# Intermediate checkpoints (keep only final models)
+models/*_ep*.pth
+models/*_resume.pth
+models/*_test*.pth
+
+# Manifests (generated locally)
+valid_images.txt
+valid_images_small.txt
+
+# TensorBoard logs
+runs/

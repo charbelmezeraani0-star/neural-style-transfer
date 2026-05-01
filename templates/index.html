@@ -3,143 +3,236 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Neural Style Transfer</title>
+  <title>NST Studio — Neural Style Transfer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/css/style.css" />
 </head>
 <body>
 
-  <!-- ── Background canvas ── -->
   <canvas id="bg-canvas"></canvas>
+  <div id="toast-container"></div>
 
-  <!-- ── Page wrapper ── -->
+  <!-- Fullscreen viewer -->
+  <div id="fs-viewer" class="fs-viewer" hidden>
+    <button id="fs-close" class="fs-close" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <img id="fs-img" src="" alt="Fullscreen preview" />
+    <a id="fs-download" class="fs-download" download="stylized.png">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download
+    </a>
+  </div>
+
   <div class="page">
 
     <!-- Header -->
     <header>
       <div class="logo">
-        <span class="logo-dot"></span>
-        <span>NST Studio</span>
-      </div>
-      <p class="tagline">Transform your photos into masterpieces</p>
-    </header>
-
-    <!-- Main card -->
-    <main class="card" id="main-card">
-
-      <!-- Upload section -->
-      <section class="upload-grid" id="upload-section">
-
-        <!-- Content drop zone -->
-        <div class="drop-zone" id="content-zone" data-type="content">
-          <div class="drop-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <rect x="3" y="3" width="18" height="18" rx="3"/>
-              <circle cx="8.5" cy="8.5" r="1.5"/>
-              <polyline points="21 15 16 10 5 21"/>
-            </svg>
-          </div>
-          <p class="drop-title">Content Image</p>
-          <p class="drop-hint">Your photo — the subject to stylize</p>
-          <input type="file" id="content-input" accept="image/*" hidden />
-          <div class="drop-preview" id="content-preview">
-            <img id="content-img" src="" alt="" />
-            <button class="remove-btn" data-for="content">&#x2715;</button>
-          </div>
-        </div>
-
-        <!-- Arrow -->
-        <div class="arrow-col">
-          <svg class="merge-arrow" viewBox="0 0 48 24" fill="none">
-            <path d="M0 12 Q24 0 48 12 Q24 24 0 12Z" fill="url(#arrowGrad)"/>
+        <div class="logo-icon">
+          <svg viewBox="0 0 36 36" fill="none">
+            <circle cx="18" cy="18" r="16" stroke="url(#lg)" stroke-width="1.5"/>
+            <circle cx="18" cy="13" r="4" fill="url(#lg)"/>
+            <path d="M10 26 Q18 16 26 26" stroke="url(#lg)" stroke-width="2" stroke-linecap="round" fill="none"/>
             <defs>
-              <linearGradient id="arrowGrad" x1="0" y1="0" x2="1" y2="0">
+              <linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
                 <stop offset="0%" stop-color="#7c3aed"/>
                 <stop offset="100%" stop-color="#ec4899"/>
               </linearGradient>
             </defs>
           </svg>
-          <span class="plus-text">+</span>
         </div>
+        <span>NST Studio</span>
+      </div>
+      <p class="tagline">Transform any photo into a work of art using deep learning</p>
+      <div class="header-pills">
+        <span class="pill">VGG-19</span>
+        <span class="pill">PatchGAN</span>
+        <span class="pill">5-Layer Style</span>
+        <span class="pill">Instant Inference</span>
+      </div>
+    </header>
 
-        <!-- Style drop zone -->
-        <div class="drop-zone" id="style-zone" data-type="style">
-          <div class="drop-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-              <path d="M2 17l10 5 10-5"/>
-              <path d="M2 12l10 5 10-5"/>
-            </svg>
-          </div>
-          <p class="drop-title">Style Image</p>
-          <p class="drop-hint">Artwork whose style to transfer</p>
-          <input type="file" id="style-input" accept="image/*" hidden />
-          <div class="drop-preview" id="style-preview">
-            <img id="style-img" src="" alt="" />
-            <button class="remove-btn" data-for="style">&#x2715;</button>
-          </div>
-        </div>
+    <!-- Main card -->
+    <main class="card" id="main-card">
 
-      </section>
-
-      <!-- Settings accordion -->
-      <section class="settings-section">
-        <button class="settings-toggle" id="settings-toggle">
+      <!-- Mode tabs -->
+      <div class="mode-tabs">
+        <button class="mode-tab active" data-mode="classic">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
           </svg>
-          Advanced Settings
-          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="6 9 12 15 18 9"/>
-          </svg>
+          Classic NST
         </button>
-        <div class="settings-body" id="settings-body">
-          <div class="sliders-grid">
-            <div class="slider-group">
-              <div class="slider-header">
-                <label for="steps-slider">Iterations</label>
-                <span class="slider-val" id="steps-val">300</span>
-              </div>
-              <input type="range" id="steps-slider" min="50" max="600" step="50" value="300" />
-              <div class="slider-range-labels"><span>50</span><span>600</span></div>
+        <button class="mode-tab" data-mode="fast">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+          </svg>
+          Fast NST
+        </button>
+        <span class="mode-badge" id="mode-badge">any style · ~5 min</span>
+      </div>
+
+      <!-- ── Classic panel ── -->
+      <div class="mode-panel" id="classic-panel">
+
+        <section class="upload-grid">
+
+          <div class="drop-zone" id="content-zone">
+            <div class="drop-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3">
+                <rect x="3" y="3" width="18" height="18" rx="3"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+              </svg>
             </div>
-            <div class="slider-group">
-              <div class="slider-header">
-                <label for="style-slider">Style Strength</label>
-                <span class="slider-val" id="style-val">30M</span>
-              </div>
-              <input type="range" id="style-slider" min="1" max="10" step="1" value="3" />
-              <div class="slider-range-labels"><span>Subtle</span><span>Intense</span></div>
-            </div>
-            <div class="slider-group">
-              <div class="slider-header">
-                <label for="content-slider">Content Fidelity</label>
-                <span class="slider-val" id="content-val">3</span>
-              </div>
-              <input type="range" id="content-slider" min="1" max="20" step="1" value="3" />
-              <div class="slider-range-labels"><span>Painterly</span><span>Faithful</span></div>
+            <p class="drop-title">Content Image</p>
+            <p class="drop-hint">Your photo — the subject to stylize</p>
+            <input type="file" id="content-input" accept="image/*" hidden />
+            <div class="drop-preview" id="content-preview">
+              <img id="content-img" src="" alt="" />
+              <button class="remove-btn" data-for="content">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
             </div>
           </div>
+
+          <div class="arrow-col">
+            <div class="merge-circle">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+            </div>
+          </div>
+
+          <div class="drop-zone" id="style-zone">
+            <div class="drop-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3">
+                <path d="M2 13.5V20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6.5"/>
+                <path d="M12 2C6.48 2 2 6.48 2 12h20C22 6.48 17.52 2 12 2z"/>
+                <circle cx="8" cy="12" r="1"/><circle cx="12" cy="10" r="1"/><circle cx="16" cy="12" r="1"/>
+              </svg>
+            </div>
+            <p class="drop-title">Style Image</p>
+            <p class="drop-hint">Artwork whose style to transfer</p>
+            <input type="file" id="style-input" accept="image/*" hidden />
+            <div class="drop-preview" id="style-preview">
+              <img id="style-img" src="" alt="" />
+              <button class="remove-btn" data-for="style">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+          </div>
+
+        </section>
+
+        <section class="settings-section">
+          <button class="settings-toggle" id="settings-toggle">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+            </svg>
+            Advanced Settings
+            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+          <div class="settings-body" id="settings-body">
+            <div class="sliders-grid">
+              <div class="slider-group">
+                <div class="slider-header">
+                  <label for="steps-slider">Iterations</label>
+                  <span class="slider-val" id="steps-val">300</span>
+                </div>
+                <input type="range" id="steps-slider" min="50" max="600" step="50" value="300" />
+                <div class="slider-range-labels"><span>50 — Fast</span><span>600 — Quality</span></div>
+              </div>
+              <div class="slider-group">
+                <div class="slider-header">
+                  <label for="style-slider">Style Strength</label>
+                  <span class="slider-val" id="style-val">30M</span>
+                </div>
+                <input type="range" id="style-slider" min="1" max="10" step="1" value="3" />
+                <div class="slider-range-labels"><span>Subtle</span><span>Intense</span></div>
+              </div>
+              <div class="slider-group">
+                <div class="slider-header">
+                  <label for="content-slider">Content Fidelity</label>
+                  <span class="slider-val" id="content-val">3</span>
+                </div>
+                <input type="range" id="content-slider" min="1" max="20" step="1" value="3" />
+                <div class="slider-range-labels"><span>Painterly</span><span>Faithful</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div><!-- /classic-panel -->
+
+      <!-- ── Fast panel ── -->
+      <div class="mode-panel" id="fast-panel" hidden>
+        <section class="fast-layout">
+
+          <div class="drop-zone" id="fast-content-zone">
+            <div class="drop-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3">
+                <rect x="3" y="3" width="18" height="18" rx="3"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+              </svg>
+            </div>
+            <p class="drop-title">Content Image</p>
+            <p class="drop-hint">Drop your photo here</p>
+            <input type="file" id="fast-content-input" accept="image/*" hidden />
+            <div class="drop-preview" id="fast-content-preview">
+              <img id="fast-content-img" src="" alt="" />
+              <button class="remove-btn" data-for="fast-content">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="model-selector" id="model-selector">
+            <p class="model-selector-title">Select Style Model</p>
+            <div class="model-list" id="model-list"></div>
+            <div class="no-models" id="no-models" hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              <p>No trained models yet</p>
+              <code>bash start_training.sh</code>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- Training samples viewer -->
+        <div class="samples-viewer" id="samples-viewer" hidden>
+          <div class="samples-header">
+            <span class="samples-title">Training Progress Samples</span>
+            <button class="btn-ghost btn-xs" id="samples-close">Hide</button>
+          </div>
+          <div class="samples-strip" id="samples-strip"></div>
         </div>
-      </section>
+
+      </div><!-- /fast-panel -->
 
       <!-- Run button -->
       <button class="run-btn" id="run-btn" disabled>
         <span class="run-btn-text">
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <polygon points="5 3 19 12 5 21 5 3"/>
-          </svg>
+          <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           Generate
         </span>
         <span class="run-btn-spinner" hidden>
           <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10" stroke-opacity=".3"/>
+            <circle cx="12" cy="12" r="10" stroke-opacity=".25"/>
             <path d="M12 2a10 10 0 0 1 10 10"/>
           </svg>
-          Processing...
+          Processing…
         </span>
       </button>
 
@@ -162,49 +255,81 @@
 
     <!-- Result panel -->
     <div class="result-panel card" id="result-panel" hidden>
-      <h2 class="result-title">Your Stylized Image</h2>
-      <div class="compare-grid">
-        <div class="compare-item">
-          <p class="compare-label">Original</p>
-          <img id="result-content-thumb" src="" alt="content" />
-        </div>
-        <div class="compare-item result-big">
-          <p class="compare-label">Stylized</p>
-          <img id="result-img" src="" alt="result" />
-        </div>
-        <div class="compare-item">
-          <p class="compare-label">Style</p>
-          <img id="result-style-thumb" src="" alt="style" />
+      <div class="result-header">
+        <h2 class="result-title">Stylized Result</h2>
+        <div class="result-actions">
+          <a id="download-btn" class="btn-primary" download="stylized.png">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download
+          </a>
+          <button class="btn-ghost" id="fullscreen-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+            Fullscreen
+          </button>
+          <button class="btn-ghost" id="again-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/></svg>
+            Try Again
+          </button>
         </div>
       </div>
-      <div class="result-actions">
-        <a id="download-btn" class="dl-btn" download="stylized.png">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="7 10 12 15 17 10"/>
-            <line x1="12" y1="15" x2="12" y2="3"/>
-          </svg>
-          Download
-        </a>
-        <button class="again-btn" id="again-btn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="1 4 1 10 7 10"/>
-            <path d="M3.51 15a9 9 0 1 0 .49-4"/>
-          </svg>
-          Try Again
-        </button>
+
+      <!-- Comparison slider -->
+      <div class="compare-slider" id="compare-slider">
+        <div class="compare-side compare-before">
+          <img id="result-content-thumb" src="" alt="Original" />
+          <span class="compare-tag compare-tag-left">Original</span>
+        </div>
+        <div class="compare-side compare-after">
+          <img id="result-img" src="" alt="Stylized" />
+          <span class="compare-tag compare-tag-right">Stylized</span>
+        </div>
+        <div class="compare-handle" id="compare-handle">
+          <div class="compare-line"></div>
+          <div class="compare-knob">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M8 5l-5 7 5 7M16 5l5 7-5 7"/>
+            </svg>
+          </div>
+        </div>
+        <input type="range" class="compare-range" id="compare-range" min="0" max="100" value="50" />
+      </div>
+
+      <!-- Style reference (classic only) -->
+      <div class="style-ref" id="style-ref" hidden>
+        <span class="style-ref-label">Style Reference</span>
+        <img id="result-style-thumb" src="" alt="Style" />
       </div>
     </div>
 
+    <!-- Gallery -->
+    <section class="gallery-section" id="gallery-section" hidden>
+      <div class="gallery-header">
+        <h3 class="gallery-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+            <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+          </svg>
+          Recent Results
+        </h3>
+        <button class="btn-ghost btn-sm" id="gallery-refresh">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/></svg>
+          Refresh
+        </button>
+      </div>
+      <div class="gallery-grid" id="gallery-grid"></div>
+    </section>
+
     <!-- Error panel -->
     <div class="error-panel card" id="error-panel" hidden>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <circle cx="12" cy="12" r="10"/>
-        <line x1="12" y1="8" x2="12" y2="12"/>
-        <line x1="12" y1="16" x2="12.01" y2="16"/>
-      </svg>
+      <div class="error-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+      </div>
       <p id="error-msg">Something went wrong.</p>
-      <button class="again-btn" id="error-again-btn">Try Again</button>
+      <button class="btn-ghost" id="error-again-btn">Try Again</button>
     </div>
 
   </div><!-- /page -->
